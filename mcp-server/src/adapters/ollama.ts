@@ -116,7 +116,7 @@ export class OllamaBackend implements Backend {
     try {
       tagsRes = await this.fetchWithTimeout(`${this.opts.baseUrl}/api/tags`, { method: 'GET' }, timeoutMs);
     } catch {
-      return { status: 'unreachable', detail: `No se pudo conectar a ${this.opts.baseUrl}` };
+      return { status: 'unreachable', detail: `Could not connect to ${this.opts.baseUrl}` };
     }
 
     if (!tagsRes.ok) {

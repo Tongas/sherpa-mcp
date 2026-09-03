@@ -88,7 +88,7 @@ export class OpenAICompatibleBackend implements Backend {
     try {
       res = await this.fetchWithTimeout(`${this.opts.baseUrl}/v1/models`, { method: 'GET' }, timeoutMs);
     } catch {
-      return { status: 'unreachable', detail: `No se pudo conectar a ${this.opts.baseUrl}` };
+      return { status: 'unreachable', detail: `Could not connect to ${this.opts.baseUrl}` };
     }
 
     if (!res.ok) {

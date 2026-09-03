@@ -33,14 +33,14 @@ describe('runRipgrep', () => {
       type: 'match',
       data: { path: { text: '/root/src/a.ts' }, line_number: 3, lines: { text: 'const x = 1;\n' } }
     });
-    const matches = runRipgrep('/root', 'const', ['/root/src'], fakeSpawnRg(line + '\n'));
+    const matches = runRipgrep('/root', 'const', ['/root/src'], '.sherpa', fakeSpawnRg(line + '\n'));
     expect(matches).toEqual([
       { path: path.join('src', 'a.ts'), lineNumber: 3, line: 'const x = 1;\n', context: [] }
     ]);
   });
 
   it('throws RipgrepNotFoundError when rg is not on PATH', () => {
-    expect(() => runRipgrep('/root', 'x', ['/root'], fakeSpawnEnoent())).toThrow(RipgrepNotFoundError);
+    expect(() => runRipgrep('/root', 'x', ['/root'], '.sherpa', fakeSpawnEnoent())).toThrow(RipgrepNotFoundError);
   });
 });
 

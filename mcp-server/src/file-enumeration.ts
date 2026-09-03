@@ -14,13 +14,19 @@ export interface EnumerationResult {
   truncatedByBudget: boolean;
 }
 
-function loadIgnoreRules(root: string): Ignore {
+function loadIgnoreRules(root: string, resultsDir: string): Ignore {
   const ig = ignore();
   const gitignorePath = path.join(root, '.gitignore');
   if (fs.existsSync(gitignorePath)) {
     ig.add(fs.readFileSync(gitignorePath, 'utf8'));
   }
-  ig.add(['.git', 'node_modules']);
+  // Always excluded, regardless of .gitignore: sherpa's own results
+  // directory. Without this, a project that hasn't yet added resultsDir
+  // to .gitignore (the README tells you to, but nothing enforces it) will
+  // have delegate_exploration read back its own prior output on the next
+  // run over the same paths — wasted local tokens, and it compounds since
+  // each run adds another file to resultsDir.
+  ig.add(['.git', 'node_modules', resultsDir]);
   return ig;
 }
 
@@ -38,8 +44,13 @@ function walk(dir: string, root: string, ig: Ignore, out: string[]): void {
   }
 }
 
-export function enumerateFiles(root: string, inputPaths: string[], maxFiles: number): EnumerationResult {
-  const ig = loadIgnoreRules(root);
+export function enumerateFiles(
+  root: string,
+  inputPaths: string[],
+  maxFiles: number,
+  resultsDir: string
+): EnumerationResult {
+  const ig = loadIgnoreRules(root, resultsDir);
   const filesSkipped: { path: string; reason: string }[] = [];
   const collected: string[] = [];
 

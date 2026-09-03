@@ -63,7 +63,7 @@ export async function delegateExploration(
     };
   }
 
-  const enumeration = enumerateFiles(root, params.paths, budgetConfig.maxFiles);
+  const enumeration = enumerateFiles(root, params.paths, budgetConfig.maxFiles, resultsDir);
   const capabilities = await backend.getCapabilities();
   const reserve = capabilities.maxOutputTokens + 300;
 

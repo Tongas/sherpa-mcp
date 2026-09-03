@@ -41,12 +41,14 @@ export function runRipgrep(
   root: string,
   pattern: string,
   resolvedPaths: string[],
+  resultsDir: string,
   spawnFn: SpawnFn = defaultSpawnFn
 ): RipgrepMatch[] {
-  const result = spawnFn('rg', ['--json', '-C', '2', '--', pattern, ...resolvedPaths], {
-    cwd: root,
-    encoding: 'utf8'
-  });
+  const result = spawnFn(
+    'rg',
+    ['--json', '-C', '2', '-g', `!/${resultsDir}/**`, '--', pattern, ...resolvedPaths],
+    { cwd: root, encoding: 'utf8' }
+  );
 
   if (result.error) {
     const code = (result.error as NodeJS.ErrnoException).code;
@@ -152,7 +154,8 @@ export async function delegateSearch(
     resolvedPaths.push(resolved);
   }
 
-  const matches = resolvedPaths.length > 0 ? runRipgrep(root, params.pattern, resolvedPaths, deps.spawnFn) : [];
+  const matches =
+    resolvedPaths.length > 0 ? runRipgrep(root, params.pattern, resolvedPaths, resultsDir, deps.spawnFn) : [];
   const capabilities = await backend.getCapabilities();
   const reserve = capabilities.maxOutputTokens + 300;
 
