@@ -1,6 +1,6 @@
 {
   "name": "sherpa-mcp",
-  "owner": "Tongas",
+  "owner": { "name": "Gastón Parravicini", "url": "https://github.com/Tongas" },
   "plugins": [
     {
       "name": "sherpa",
