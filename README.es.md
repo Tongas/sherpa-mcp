@@ -69,8 +69,31 @@ Esto te da el MCP server, el skill y `/sherpa-status` juntos, de una:
 **Configurá el backend.** Un MCP server instalado vía plugin hereda el
 entorno del propio proceso de Claude Code — no hay una forma documentada
 de adjuntarle un bloque `env` propio después de instalarlo vía
-marketplace. Así que seteá las variables `SHERPA_*` en tu shell profile
-(`~/.bashrc`, `~/.zshrc`, etc.) antes de lanzar `claude`:
+marketplace. Eso hace que depender del shell sea frágil: si abrís Claude
+Code desde un launcher gráfico en vez de una terminal, no hereda nada de
+tu `~/.bashrc`/`~/.zshrc`.
+
+**Recomendado: un archivo de config**, que sherpa lee sin importar cómo
+se haya abierto Claude Code. Creá `~/.claude/sherpa/config.json`
+(aplica en todos lados) o `./sherpa.config.json` en un proyecto puntual
+(mismas claves, en camelCase):
+
+```json
+{
+  "backend": "openai-compatible",
+  "baseUrl": "http://localhost:8080",
+  "model": "qwen2.5-coder-14b",
+  "contextWindowOverride": 32768,
+  "maxOutputTokensOverride": 8192
+}
+```
+
+(Para Ollama, sacá `backend`/`contextWindowOverride`/`maxOutputTokensOverride`
+— con `baseUrl` y `model` alcanza; ver [Configuración](#configuración)
+más abajo para la lista completa de claves.)
+
+**Alternativa rápida:** si siempre abrís Claude Code desde una shell,
+exportar las variables también funciona:
 
 ```bash
 export SHERPA_BASE_URL="http://localhost:11434"   # default de Ollama
@@ -80,11 +103,10 @@ export SHERPA_MODEL="qwen2.5-coder:14b"            # el modelo que tengas descar
 Para un backend `openai-compatible` (llama.cpp server, LM Studio),
 exportá también `SHERPA_BACKEND=openai-compatible` más
 `SHERPA_CONTEXT_WINDOW` y `SHERPA_MAX_OUTPUT_TOKENS` con los valores
-reales de tu server — ver la tabla de [Configuración](#configuración)
-más abajo para qué hace cada uno. No hay endpoint estándar para
-descubrir la ventana de contexto, así que sin esto sherpa cae a un
-conservador 4096/2048, lo que hace que `delegate_transform` saltee
-archivos de más de unas 200 líneas.
+reales de tu server. No hay endpoint estándar para descubrir la ventana
+de contexto, así que sin alguno de estos dos métodos de config sherpa
+cae a un conservador 4096/2048, lo que hace que `delegate_transform`
+saltee archivos de más de unas 200 líneas.
 
 **Verificá:** abrí una sesión nueva y corré `/sherpa-status`. Muestra el
 backend activo, el modelo cargado, y de dónde salió cada valor de

@@ -68,9 +68,31 @@ in one shot:
 
 **Configure the backend.** A plugin-provided MCP server inherits Claude
 Code's own process environment — there's no documented way to attach a
-per-plugin `env` block after a marketplace install. So set the
-`SHERPA_*` variables in your shell profile (`~/.bashrc`, `~/.zshrc`,
-etc.) before launching `claude`:
+per-plugin `env` block after a marketplace install. That makes shell
+exports fragile: if you launch Claude Code from a GUI launcher instead
+of a terminal, it doesn't inherit anything from `~/.bashrc`/`~/.zshrc`.
+
+**Recommended: a config file**, which sherpa reads regardless of how
+Claude Code was launched. Create `~/.claude/sherpa/config.json` (applies
+everywhere) or `./sherpa.config.json` in a specific project (same keys,
+camelCase):
+
+```json
+{
+  "backend": "openai-compatible",
+  "baseUrl": "http://localhost:8080",
+  "model": "qwen2.5-coder-14b",
+  "contextWindowOverride": 32768,
+  "maxOutputTokensOverride": 8192
+}
+```
+
+(For Ollama, drop `backend`/`contextWindowOverride`/`maxOutputTokensOverride`
+— just `baseUrl` and `model` are enough; see
+[Configuration](#configuration) below for the full key list.)
+
+**Quick alternative:** if you're always launching Claude Code from a
+shell, exporting env vars works too:
 
 ```bash
 export SHERPA_BASE_URL="http://localhost:11434"   # Ollama default
@@ -79,11 +101,10 @@ export SHERPA_MODEL="qwen2.5-coder:14b"            # whatever you have pulled
 
 For an `openai-compatible` backend (llama.cpp server, LM Studio), also
 export `SHERPA_BACKEND=openai-compatible` plus `SHERPA_CONTEXT_WINDOW`
-and `SHERPA_MAX_OUTPUT_TOKENS` set to your server's real values — see
-the [Configuration](#configuration) table below for what each one does.
-There's no standard endpoint to discover the context window, so without
-these sherpa falls back to a conservative 4096/2048, which makes
-`delegate_transform` skip files over roughly 200 lines.
+and `SHERPA_MAX_OUTPUT_TOKENS` set to your server's real values. There's
+no standard endpoint to discover the context window, so without one of
+these two config methods sherpa falls back to a conservative 4096/2048,
+which makes `delegate_transform` skip files over roughly 200 lines.
 
 **Verify:** open a new session and run `/sherpa-status`. It shows the
 active backend, the loaded model, and where each config value actually

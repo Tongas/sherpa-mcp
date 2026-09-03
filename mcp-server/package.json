@@ -1,6 +1,6 @@
 {
   "name": "sherpa-mcp",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server that delegates high-volume file exploration, search, and transformation to a local LLM backend",
   "author": "Gastón Parravicini",
   "license": "MIT",
