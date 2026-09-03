@@ -1,0 +1,11 @@
+{
+  "name": "sherpa",
+  "description": "Delegates file exploration, search, and batch transformation to a local model (Ollama / llama.cpp / LM Studio), preserving the orchestrator's context.",
+  "version": "0.1.0",
+  "mcpServers": {
+    "sherpa": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/mcp-server/dist/index.js"]
+    }
+  }
+}

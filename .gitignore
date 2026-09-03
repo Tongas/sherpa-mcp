@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tgz
+.sherpa/
+*.local.json
+.env
+
+# internal process artifacts (planning docs), not meant for the public repo
+docs/superpowers/
+SPEC.md
