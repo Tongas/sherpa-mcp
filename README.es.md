@@ -2,49 +2,105 @@
 
 # sherpa
 
+**Un plugin de Claude Code que delega el trabajo pesado — leer, buscar y editar código en batch — a tu LLM local.**
+
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%E2%89%A518-brightgreen.svg)](https://nodejs.org)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Tongas/sherpa-mcp/pulls)
 
-Usá tu suscripción de Claude y tu IA local al mismo tiempo. Claude pone
-el razonamiento; tu modelo local hace la lectura pesada. Vos ahorrás
-tokens.
+Usá tu suscripción de Claude y tu IA local al mismo tiempo, dentro de
+Claude Code. Claude pone el razonamiento; tu modelo local hace la lectura
+pesada. Vos ahorrás tokens.
 
 ## Cómo funciona
 
-Claude decide qué delegar. Tu modelo local lee y procesa los archivos.
-A Claude le vuelve un resumen corto. El sherpa carga el peso — vos
-seguís decidiendo la ruta.
+Cuando delegás una tarea, tu modelo local lee, busca o reescribe archivos
+en tu propio hardware. Al contexto de Claude Code vuelve solo un resumen
+corto — el contenido de los archivos nunca entra. El sherpa carga el
+peso; vos seguís decidiendo la ruta.
+
+sherpa viene como plugin de Claude Code: un MCP server con cinco tools,
+un skill que le enseña a Claude cuándo delegar conviene, y un comando
+`/sherpa-status` para diagnosticar tu configuración.
 
 ## La evidencia
 
-Sobre un proyecto Python real de 41 archivos, una corrida de
-`delegate_exploration`:
+Explorando el mismo codebase Python de 3 capas, mismo prompt, de dos
+formas:
 
 | | Directo (Claude lee los archivos) | Con sherpa |
 |---|---|---|
-| Tokens en el contexto de Claude | ~190.074 (el contenido de los archivos) | ~600 (solo el resumen) |
-| Tokens locales procesados | 0 | 190.074 |
-| Tiempo real (wall-clock) | ~39s | ~150s |
+| Tokens que entran al contexto de Claude | ~190.000 (el contenido de los archivos) | ~600 (solo el resumen) |
+| Tokens procesados localmente | 0 | ~149.000 |
+| Tiempo real (wall-clock) | ~39s | ~100s |
+| Archivos cubiertos | 41 | 24 |
 
-Eso es aproximadamente una relación 300:1 entre tokens locales y tokens
-del orquestador — y delegar tardó unas 4x más en tiempo real. **Esto es
-una medición en un repo con un modelo, no un benchmark.** Tu ratio real
-depende del tamaño de archivo, la instrucción, y el modelo que uses. El
-valor acá es el contexto ahorrado, no la velocidad — ver "Cuándo NO
-usarlo" más abajo.
+Dos cosas importan más que el ratio:
+
+**El resumen delegado se sostuvo.** Claude ya había mapeado ese mismo
+codebase a mano en un turno anterior. Cuando volvió el resumen de sherpa,
+coincidía: mismo conteo de checks, mismos patrones internos, misma cadena
+del modelo de datos. El modelo local no produjo una respuesta más vaga —
+produjo la misma respuesta sin gastar contexto del orquestador.
+
+**Delegar es más lento, no más rápido.** Del orden de 2 a 4 veces en
+tiempo real. El valor acá es el contexto ahorrado, no la velocidad. Ver
+[Cuándo NO usarlo](#cuándo-no-usarlo).
+
+**Esto es una medición, en un repo, con un modelo — no un benchmark.** Tu
+ratio real depende del tamaño de los archivos, la instrucción, y el
+modelo que uses.
 
 ## Quickstart
 
-Prerequisitos: Node.js ≥ 18, [ripgrep](https://github.com/BurntSushi/ripgrep#installation) (`rg`) en `PATH`, y un backend local corriendo (Ollama, llama.cpp server, o LM Studio).
+Prerequisitos: Node.js ≥ 18, [ripgrep](https://github.com/BurntSushi/ripgrep#installation)
+(`rg`) en `PATH`, y un backend local corriendo (Ollama, llama.cpp server,
+o LM Studio).
 
-**Registralo en Claude Code.** Esto es lo que más confunde al instalar:
-la config va en el `env` del MCP server, **no en tu shell** — `export
-SHERPA_MODEL=...` en una terminal no hace nada, porque el server corre
-en su propio subproceso con su propio entorno. Agregá esto a tu
-`~/.claude.json` (o a un `.mcp.json` de proyecto):
+### Camino principal: instalar el plugin
 
-Ollama:
+Esto te da el MCP server, el skill y `/sherpa-status` juntos, de una:
+
+```
+/plugin marketplace add Tongas/sherpa-mcp
+/plugin install sherpa@sherpa-mcp
+```
+
+**Configurá el backend.** Un MCP server instalado vía plugin hereda el
+entorno del propio proceso de Claude Code — no hay una forma documentada
+de adjuntarle un bloque `env` propio después de instalarlo vía
+marketplace. Así que seteá las variables `SHERPA_*` en tu shell profile
+(`~/.bashrc`, `~/.zshrc`, etc.) antes de lanzar `claude`:
+
+```bash
+export SHERPA_BASE_URL="http://localhost:11434"   # default de Ollama
+export SHERPA_MODEL="qwen2.5-coder:14b"            # el modelo que tengas descargado
+```
+
+Para un backend `openai-compatible` (llama.cpp server, LM Studio),
+exportá también `SHERPA_BACKEND=openai-compatible` más
+`SHERPA_CONTEXT_WINDOW` y `SHERPA_MAX_OUTPUT_TOKENS` con los valores
+reales de tu server — ver la tabla de [Configuración](#configuración)
+más abajo para qué hace cada uno. No hay endpoint estándar para
+descubrir la ventana de contexto, así que sin esto sherpa cae a un
+conservador 4096/2048, lo que hace que `delegate_transform` saltee
+archivos de más de unas 200 líneas.
+
+**Verificá:** abrí una sesión nueva y corré `/sherpa-status`. Muestra el
+backend activo, el modelo cargado, y de dónde salió cada valor de
+config, para que un typo no pase desapercibido.
+
+### Alternativa: solo el MCP server, vía npx
+
+Usá esto si solo querés las tools — por ejemplo, para conectar sherpa a
+algo que no sea Claude Code. **No vas a tener el skill ni
+`/sherpa-status`**, o sea que no hay guía automática de cuándo conviene
+delegar ni una forma integrada de chequear qué quedó configurado; vas a
+tener que invocar las tools explícitamente y conocer tu propio setup.
+
+Agregá esto a `~/.claude.json` (o a un `.mcp.json` de proyecto) — acá el
+bloque `env` es explícito y sí funciona, porque estás registrando el MCP
+server directo, no a través de un plugin:
 
 ```json
 {
@@ -61,34 +117,14 @@ Ollama:
 }
 ```
 
-llama.cpp server (o cualquier servidor OpenAI-compatible):
-
-```json
-{
-  "mcpServers": {
-    "sherpa": {
-      "command": "npx",
-      "args": ["-y", "sherpa-mcp"],
-      "env": {
-        "SHERPA_BACKEND": "openai-compatible",
-        "SHERPA_BASE_URL": "http://localhost:8080",
-        "SHERPA_MODEL": "qwen2.5-coder-14b",
-        "SHERPA_CONTEXT_WINDOW": "32768",
-        "SHERPA_MAX_OUTPUT_TOKENS": "8192"
-      }
-    }
-  }
-}
-```
-
-**Verificá:** corré `/sherpa-status` en Claude Code. Muestra el backend
-activo, el modelo cargado y — lo más importante — de dónde salió cada
-valor de config, para que un typo no pase desapercibido.
+Para un backend `openai-compatible`, agregá `SHERPA_BACKEND`,
+`SHERPA_CONTEXT_WINDOW` y `SHERPA_MAX_OUTPUT_TOKENS` a ese mismo bloque
+`env`, igual que arriba.
 
 Probado con llama.cpp server. También soporta Ollama y LM Studio vía la
 misma interfaz OpenAI-compatible.
 
-### Instalación desde un clone (desarrollo)
+#### Instalación desde un clone (desarrollo)
 
 Si estás trabajando sobre `sherpa` mismo, compilá localmente en vez de
 usar `npx`:
@@ -108,45 +144,63 @@ Y apuntá `command`/`args` al entrypoint compilado en vez de `npx`:
 }
 ```
 
-## Ejemplos de uso
+## Prompts de ejemplo
 
-**Reconocimiento de un codebase que todavía no leíste:**
+Estos son prompts que efectivamente corrimos, no hipotéticos. Nombrá
+sherpa en el prompt — ver [Activación automática vs. explícita](#activación-automática-vs-explícita)
+para saber por qué.
 
-> "Acabo de clonar este repo, dame un mapa de cómo fluyen los requests
-> desde la capa HTTP hasta la base de datos."
+**1. Reconocimiento de codebase — el caso principal:**
 
-Claude delega a `delegate_exploration` sobre los directorios relevantes.
-El modelo local lee los archivos y devuelve una síntesis; Claude nunca
-lee el código fuente crudo.
+> Usá sherpa para explorar este proyecto y decime cómo está estructurada
+> la lógica de auditoría
 
-**Búsqueda que necesita síntesis, no solo matches:**
+Medido: 24 archivos, ~149k tokens procesados localmente, ~100s, y solo el
+resumen entró al contexto de Claude.
 
-> "Buscá todos los lugares donde llamamos a la API de logging vieja y
-> resumí qué hay que cambiar."
+**2. Búsqueda con síntesis:**
 
-`delegate_search` corre ripgrep para los matches reales, y después le
-pide al modelo local que los resuma según tu instrucción — más que un
-volcado de grep, menos que leer cada match vos mismo.
+> Usá sherpa para encontrar todos los usos de la API vieja de logging y
+> resumime qué hay que cambiar
 
-**Transformación batch:**
+ripgrep hace la búsqueda; el modelo local solo sintetiza los matches.
 
-> "Renombrá esta clave de config en los 40 archivos que la referencian."
+**3. Transformación batch:**
 
-`delegate_transform` propone el cambio por archivo (`resultPath` tiene
-el diff completo). Revisás `diffPreview`, y después `apply_transform`
-escribe exactamente lo que revisaste — nunca algo regenerado después.
+> Usá sherpa para renombrar la clave de config `oldName` a `newName` en
+> todo el proyecto
+
+`dry_run` es el default: obtenés una propuesta revisable con diffs por
+archivo, no se escribe nada. Después `apply_transform` escribe
+exactamente lo que revisaste — sin regenerar, y rechaza cualquier archivo
+que haya cambiado en disco mientras tanto.
+
+## Activación automática vs. explícita
+
+El plugin trae un skill que le enseña a Claude cuándo delegar conviene, y
+a veces se dispara solo. Pero en la práctica, la activación automática no
+es confiable para exploración: Claude a menudo prefiere sus herramientas
+nativas (`Read`, `Grep`, el agente Explore) aunque el skill esté cargado
+y las tools estén visibles.
+
+**Para tener garantía, nombrá sherpa en el prompt.** La invocación
+explícita funciona de forma consistente.
+
+Medido en Claude Code v2.x. Puede cambiar en versiones futuras.
 
 ## Cuándo NO usarlo
 
-Si Claude ya tiene el mapa del proyecto en contexto — archivos ya
-leídos en esta sesión, o un codebase chico — las herramientas directas
-(`Read`, `Grep`) ganan siempre. Delegar es más lento, no más rápido (ver
-la comparación de 150s vs 39s arriba): el valor es el contexto ahorrado,
-no la velocidad. Y v1 no escribe código nuevo — `delegate_transform`
-solo hace transformaciones mecánicas sobre archivos que ya existen
-(renombrar, agregar boilerplate repetitivo), no features o lógica
-nueva. Ver `skills/sherpa/SKILL.md` para la tabla completa de cuándo sí
-/ cuándo no.
+Si Claude ya tiene el mapa del proyecto en contexto — archivos ya leídos
+en esta sesión, o un codebase chico — las herramientas directas ganan
+siempre. Delegar cuesta un round trip; leer dos archivos conocidos no.
+
+Delegar es más lento, no más rápido. El valor es el contexto ahorrado, no
+la velocidad.
+
+Y v1 no escribe código nuevo: `delegate_transform` hace transformaciones
+mecánicas sobre archivos que ya existen (renombrar, boilerplate
+repetitivo), no features ni lógica nueva. Ver `skills/sherpa/SKILL.md`
+para la tabla completa de cuándo sí / cuándo no.
 
 ## Las tools
 
@@ -160,8 +214,8 @@ nueva. Ver `skills/sherpa/SKILL.md` para la tabla completa de cuándo sí
 
 ## Configuración
 
-Anda con cero archivos, solo variables de entorno (ver el Quickstart
-para dónde van). Precedencia: env del MCP server > `sherpa.config.json`
+Anda con cero archivos, solo variables de entorno (ver el Quickstart para
+dónde van). Precedencia: env del MCP server > `sherpa.config.json`
 (proyecto) > `~/.claude/sherpa/config.json` (usuario) > defaults.
 
 | Variable | Default | Uso |
@@ -181,7 +235,7 @@ También podés usar `./sherpa.config.json` (por proyecto) o
 camelCase.
 
 Agregá `.sherpa/` a tu `.gitignore` — los resultados completos de cada
-`delegate_*` se acumulan ahí sin límite en v1 (ver Limitaciones).
+`delegate_*` se acumulan ahí sin límite en v1.
 
 ## Seguridad
 
@@ -200,36 +254,32 @@ Agregá `.sherpa/` a tu `.gitignore` — los resultados completos de cada
 
 - **Sin limpieza automática de `.sherpa/`**: los resultados se acumulan
   indefinidamente — borralos manualmente cuando quieras.
-- **Guarda de truncado en `delegate_transform`** (`SHERPA_TRUNCATION_THRESHOLD`,
-  default `0.75`): es un umbral ciego a intención. Una instrucción que
-  legítimamente acorta mucho un archivo (ej. "borrá todo el código
-  muerto") puede disparar un falso rechazo — bajá el umbral para ese caso
-  de uso puntual.
-- **v1 no escribe código nuevo**: `delegate_transform` solo hace
-  transformaciones mecánicas sobre archivos existentes (renombrar,
-  agregar boilerplate repetitivo), no generación de features o lógica
-  nueva.
+- **`delegate_transform` saltea (no falla) archivos que exceden el
+  presupuesto de salida del modelo**: con los defaults conservadores del
+  fallback (4096/2048) esto afecta archivos de más de unas 200 líneas.
+  Poné en `SHERPA_CONTEXT_WINDOW`/`SHERPA_MAX_OUTPUT_TOKENS` los valores
+  reales de tu server para evitarlo.
+- **Guarda de truncado en `delegate_transform`**
+  (`SHERPA_TRUNCATION_THRESHOLD`, default `0.75`): es un umbral ciego a
+  intención. Una instrucción que legítimamente acorta mucho un archivo
+  (ej. "borrá todo el código muerto") puede disparar un falso rechazo —
+  bajá el umbral para ese caso de uso puntual.
+- **v1 no escribe código nuevo**: solo transformaciones mecánicas sobre
+  archivos existentes, no features ni lógica nueva.
 - **`getCapabilities()` en backends `openai-compatible`**: no hay
   endpoint estándar para descubrir la ventana de contexto en llama.cpp
-  server / LM Studio. Usa `SHERPA_CONTEXT_WINDOW`/`SHERPA_MAX_OUTPUT_TOKENS`
-  si los seteás, si no cae a un fallback conservador (4096/2048). Si
-  cambiás el modelo cargado sin actualizar esas variables, el chunking va
-  a usar valores desactualizados.
+  server / LM Studio. Si cambiás el modelo cargado sin actualizar las
+  variables de entorno, el chunking va a usar valores desactualizados.
 - **Sin fallback ni reintento automático** si el backend local no
-  responde: es intencional (ver `skills/sherpa/SKILL.md`) — Claude hace
-  la tarea él mismo y sigue.
+  responde: es intencional — Claude hace la tarea él mismo y sigue, sin
+  interrumpir tu sesión.
 - **TOCTOU en la guarda de staleness de `apply_transform`**: hay una
-  ventana inevitable entre la lectura del hash y la escritura del
-  archivo (las APIs sync de `fs` de Node no ofrecen una operación
-  atómica de "verificar y escribir" para este caso).
-- **`file-enumeration.ts` no sigue symlinks**: un árbol fuente que es
-  (o contiene) un symlink va a devolver cero archivos en lugar de un
-  error — no hay aviso explícito de que se está enumerando un symlink.
-- **`delegate_transform` salta (no falla) archivos que exceden el
-  presupuesto de salida del modelo** en vez de reportar un error: con
-  los defaults conservadores del fallback de Ollama/openai-compatible
-  (4096/2048) esto ronda archivos de más de ~200 líneas, lo cual puede
-  sorprender en un primer uso.
+  ventana inevitable entre la lectura del hash y la escritura del archivo
+  (las APIs sync de `fs` de Node no ofrecen una operación atómica de
+  "verificar y escribir" para este caso).
+- **`file-enumeration.ts` no sigue symlinks**: un árbol fuente que es (o
+  contiene) un symlink devuelve cero archivos en lugar de un error — no
+  hay aviso explícito de que se está enumerando un symlink.
 
 ## Licencia
 

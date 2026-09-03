@@ -5,6 +5,10 @@ dist/
 *.local.json
 .env
 
+# copied from the repo root by prepublishOnly, so npm's package page has a
+# README — the root README.md stays the source of truth, this is generated
+mcp-server/README.md
+
 # internal process artifacts (planning docs), not meant for the public repo
 docs/superpowers/
 SPEC.md

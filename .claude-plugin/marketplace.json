@@ -1,0 +1,11 @@
+{
+  "name": "sherpa-mcp",
+  "owner": "Tongas",
+  "plugins": [
+    {
+      "name": "sherpa",
+      "source": ".",
+      "description": "Delegates file exploration, search, and batch transformation to a local model (Ollama / llama.cpp / LM Studio), preserving the orchestrator's context."
+    }
+  ]
+}

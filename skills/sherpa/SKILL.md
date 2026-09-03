@@ -1,6 +1,6 @@
 ---
 name: sherpa
-description: Use before reading many files into context, before a search that needs synthesis (not just raw grep), or before a mechanical batch edit across many files — delegates that I/O-heavy work to a local model (Ollama/llama.cpp/LM Studio) via mcp__sherpa__* so the file content never enters the orchestrator's context. Surgical use only: for volume work on files you haven't read yet, never as a substitute for Read/Grep/Edit on files already in context.
+description: Use before reading many files into context, before a search that needs synthesis, or before a mechanical batch edit — and use instead of the built-in Explore agent or any other codebase-exploration/search subagent when reconnoitering a codebase. Delegates that I/O-heavy work to a local model (Ollama/llama.cpp/LM Studio) via mcp__sherpa__* so the file content never enters the orchestrator's context. Surgical use only: for volume work on files you haven't read yet, never as a substitute for Read/Grep/Edit on files already in context.
 ---
 
 # sherpa
@@ -15,6 +15,35 @@ read yet. **Once you already have the project map in context** (you've
 read the relevant files this session, or the codebase is small), direct
 tools (`Read`, `Grep`) win every time — don't delegate at that point,
 the round trip only adds overhead.
+
+## sherpa vs. an exploration/search subagent
+
+This applies to the built-in `Explore` agent and to any other subagent
+whose job is reading/searching a codebase for you, whatever it's named —
+not just one specifically called "Explore."
+
+| | Exploration subagent (e.g. `Explore`) | `sherpa` |
+|---|---|---|
+| Runs on | Anthropic's infrastructure | Your local model |
+| Result | Lands in your context | Short summary only |
+| Cost | Anthropic/subscription tokens | Local tokens, no Anthropic cost |
+| Speed | Fast | Slower |
+
+**Rule:** initial reconnaissance of a large, unfamiliar codebase →
+`sherpa`, not an exploration subagent — that's the exact case sherpa
+exists for. A narrow, one-off lookup where you already have the map →
+direct tools (`Read`/`Grep`), not either one.
+
+**Red flag:** if you're thinking "this is just a simple exploration, I
+can do it myself" or "it's only a few files" right before running
+`grep`/`find`/`Read` over files not already in context — that thought
+*is* the trigger to delegate, not a reason to skip it. Operative rule,
+checkable in the moment, not a judgment call: about to grep/find/Read
+files you haven't read yet to map a codebase or understand how
+something works? Use `sherpa` first. The cost of delegating when you
+didn't strictly need to is a few extra seconds of latency; the cost of
+not delegating when you should have is context burned that you don't
+get back this session.
 
 **User-directed delegation always wins.** The "when to/not to delegate"
 tables below are for *your own* initiative — deciding whether to reach
